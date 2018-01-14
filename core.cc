@@ -13,6 +13,8 @@ namespace NCALC {
 
 
 Core::Core(QObject *parent) : QObject(parent),
+  wait_for_operand_(false),
+  num_cache_(0.0),
   display_(new QLineEdit())
 {
   qDebug() << "Core: construct";
@@ -24,9 +26,21 @@ Core::~Core()
   qDebug() << "Core: destruct";
 }
 
+auto Core::AddOperate() -> void
+{
+  num_cache_ += display_->text().toDouble();
+  display_->setText(QString::number(num_cache_));
+  wait_for_operand_ = true;
+}
+
 auto Core::DisplayText(int num) -> void
 {
-  display_->setText(display_->text() + QString::number(num));
+  if (wait_for_operand_) {
+    display_->clear();
+    wait_for_operand_ = false;
+  }
+  display_->setText(display_->text() == "0" ? QString::number(num):
+                    display_->text() + QString::number(num));
 }
 
 auto Core::OnBackSpace() -> void
@@ -37,6 +51,7 @@ auto Core::OnBackSpace() -> void
 auto Core::OnClear() -> void
 {
   qDebug() << "Core: c";
+  display_->setText(QString::number(0));
 }
 
 auto Core::OnDevide() -> void
@@ -127,6 +142,7 @@ auto Core::OnNum9() -> void
 auto Core::OnPlus() -> void
 {
   qDebug() << "Core: +";
+  AddOperate();
 }
 
 auto Core::OnTo2Bin() -> void
@@ -142,6 +158,7 @@ auto Core::OnToHex() -> void
 auto Core::SetDisplay(QLineEdit* line_edit) -> bool
 {
   display_.reset(line_edit);
+  display_->setText("0");
   return !display_.isNull();
 }
 

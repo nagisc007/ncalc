@@ -22,6 +22,7 @@ public:
   // methods: base
   bool SetDisplay(QLineEdit*);
   // methods: calc
+  void AddOperate();
   void DisplayText(int);
   // methods: menu
   void OnTo2Bin();
@@ -50,6 +51,8 @@ signals:
 public slots:
 
 private:
+  bool wait_for_operand_ = false;
+  double num_cache_;
   QScopedPointer<QLineEdit> display_;
 };
 
