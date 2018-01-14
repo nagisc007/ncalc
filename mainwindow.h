@@ -50,6 +50,16 @@ private slots:
   void on_Button_8_clicked();
   void on_Button_9_clicked();
 
+  void on_Button_ToDecimal_clicked();
+
+  void on_Button_And_clicked();
+
+  void on_Button_Or_clicked();
+
+  void on_Button_Not_clicked();
+
+  void on_Button_Xor_clicked();
+
 private:
   Ui::MainWindow *ui;
   QScopedPointer<NCALC::Core> core_;

@@ -16,13 +16,16 @@ Core::Core(QObject *parent) : QObject(parent),
   wait_for_operand_(false),
   num_cache_(0.0),
   factor_(OpFactor::NONE),
-  display_(new QLineEdit())
+  mode_(OpMode::DECIMAL),
+  display_(new QLineEdit()),
+  mode_label_(new QLabel())
 {
   qDebug() << "Core: construct";
 }
 
 Core::~Core()
 {
+  if (mode_label_) mode_label_.reset();
   if (display_) display_.reset();
   qDebug() << "Core: destruct";
 }
@@ -35,12 +38,22 @@ auto Core::AddOperate() -> void
   display_->setText(QString::number(num_cache_));
 }
 
+auto Core::ChopText() -> void
+{
+  auto tmp = display_->text();
+  tmp.chop(1);
+  if (tmp.isEmpty()) {
+    tmp = "0";
+  }
+  display_->setText(tmp);
+}
+
 auto Core::ClearOperate() -> void
 {
   num_cache_ = 0.0;
   factor_ = OpFactor::NONE;
   wait_for_operand_ = false;
-  display_->setText(0);
+  display_->setText("0");
 }
 
 auto Core::DevideOperate() -> void
@@ -73,117 +86,60 @@ auto Core::MultiplyOperate() -> void
 auto Core::OnBackSpace() -> void
 {
   qDebug() << "Core: bc";
+  ChopText();
 }
 
 auto Core::OnClear() -> void
 {
   qDebug() << "Core: c";
-  display_->setText(QString::number(0));
+  ClearOperate();
 }
 
-auto Core::OnDevide() -> void
+auto Core::OnNumber(int num) -> void
 {
-  qDebug() << "Core: /";
-  DevideOperate();
+  DisplayText(num);
 }
 
-auto Core::OnDot() -> void
+auto Core::OnOperate(OpFactor factor) -> void
 {
-  qDebug() << "Core: .";
+  switch (factor) {
+  case OpFactor::DEVIDE:
+    return DevideOperate();
+  case OpFactor::MINUS:
+    return SubtractOperate();
+  case OpFactor::MULTI:
+    return MultiplyOperate();
+  case OpFactor::PLUS:
+    return AddOperate();
+  case OpFactor::DOT:
+    return PointText();
+  case OpFactor::EQUAL:
+    return ShowResult();
+  case OpFactor::AND:
+    return;
+  case OpFactor::NOT:
+    return;
+  case OpFactor::XOR:
+    return;
+  case OpFactor::OR:
+    return;
+  case OpFactor::NONE:
+    return;
+  }
 }
 
-auto Core::OnEqual() -> void
+auto Core::OnOperate(OpMode mode) -> void
 {
-  qDebug() << "Core: =";
-  ShowResult();
+  mode_ = mode;
+  mode_label_->setText(mode == OpMode::BIT ? "B":
+                                             mode == OpMode::HEX ? "X": "D");
 }
 
-auto Core::OnMinus() -> void
+auto Core::PointText() -> void
 {
-  qDebug() << "Core: -";
-  SubtractOperate();
-}
-
-auto Core::OnMultiply() -> void
-{
-  qDebug() << "Core: *";
-  MultiplyOperate();
-}
-
-auto Core::OnNum0() -> void
-{
-  qDebug() << "Core: 0";
-  DisplayText(0);
-}
-
-auto Core::OnNum1() -> void
-{
-  qDebug() << "Core: 1";
-  DisplayText(1);
-}
-
-auto Core::OnNum2() -> void
-{
-  qDebug() << "Core: 2";
-  DisplayText(2);
-}
-
-auto Core::OnNum3() -> void
-{
-  qDebug() << "Core: 3";
-  DisplayText(3);
-}
-
-auto Core::OnNum4() -> void
-{
-  qDebug() << "Core: 4";
-  DisplayText(4);
-}
-
-auto Core::OnNum5() -> void
-{
-  qDebug() << "Core: 5";
-  DisplayText(5);
-}
-
-auto Core::OnNum6() -> void
-{
-  qDebug() << "Core: 6";
-  DisplayText(6);
-}
-
-auto Core::OnNum7() -> void
-{
-  qDebug() << "Core: 7";
-  DisplayText(7);
-}
-
-auto Core::OnNum8() -> void
-{
-  qDebug() << "Core: 8";
-  DisplayText(8);
-}
-
-auto Core::OnNum9() -> void
-{
-  qDebug() << "Core: 9";
-  DisplayText(9);
-}
-
-auto Core::OnPlus() -> void
-{
-  qDebug() << "Core: +";
-  AddOperate();
-}
-
-auto Core::OnTo2Bin() -> void
-{
-  qDebug() << "Core: to 0b";
-}
-
-auto Core::OnToHex() -> void
-{
-  qDebug() << "Core: to 0x";
+  if (!display_->text().contains(".")) {
+    display_->setText(display_->text() + ".");
+  }
 }
 
 auto Core::PreOperate() -> void
@@ -210,14 +166,35 @@ auto Core::PreOperate() -> void
     num_cache_ /= display_->text().toDouble();
     qDebug() << "cache = " << num_cache_;
     return;
+  case OpFactor::EQUAL:
+    return;
+  case OpFactor::AND:
+    return;
+  case OpFactor::DOT:
+    return;
+  case OpFactor::NOT:
+    return;
+  case OpFactor::OR:
+    return;
+  case OpFactor::XOR:
+    return;
   }
 }
 
 auto Core::SetDisplay(QLineEdit* line_edit) -> bool
 {
   display_.reset(line_edit);
+  if (display_.isNull()) return false;
   display_->setText("0");
-  return !display_.isNull();
+  return true;
+}
+
+auto Core::SetModeLabel(QLabel* label) -> bool
+{
+  mode_label_.reset(label);
+  if (mode_label_.isNull()) return false;
+  mode_label_->setText("D");
+  return true;
 }
 
 auto Core::ShowResult() -> void
