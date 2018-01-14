@@ -17,6 +17,7 @@ MainWindow::MainWindow(QWidget *parent) :
 {
   ui->setupUi(this);
   qDebug() << "MainWindow: construct";
+  InitWidgets();
 }
 
 MainWindow::~MainWindow()
@@ -26,104 +27,13 @@ MainWindow::~MainWindow()
   qDebug() << "MainWindow: destruct";
 }
 
-auto MainWindow::OnBackSpace() -> void
+auto MainWindow::InitWidgets() -> void
 {
-  qDebug() << "MainWindow: bc";
-}
-
-auto MainWindow::OnClear() -> void
-{
-  qDebug() << "MainWindow: c";
-}
-
-auto MainWindow::OnDevide() -> void
-{
-  qDebug() << "MainWindow: /";
-}
-
-auto MainWindow::OnDot() -> void
-{
-  qDebug() << "MainWindow: .";
-}
-
-auto MainWindow::OnEqual() -> void
-{
-  qDebug() << "MainWindow: =";
-}
-
-auto MainWindow::OnMinus() -> void
-{
-  qDebug() << "MainWindow: -";
-}
-
-auto MainWindow::OnMultiply() -> void
-{
-  qDebug() << "MainWindow: *";
-}
-
-auto MainWindow::OnNum0() -> void
-{
-  qDebug() << "MainWindow: 0";
-}
-
-auto MainWindow::OnNum1() -> void
-{
-  qDebug() << "MainWindow: 1";
-}
-
-auto MainWindow::OnNum2() -> void
-{
-  qDebug() << "MainWindow: 2";
-}
-
-auto MainWindow::OnNum3() -> void
-{
-  qDebug() << "MainWindow: 3";
-}
-
-auto MainWindow::OnNum4() -> void
-{
-  qDebug() << "MainWindow: 4";
-}
-
-auto MainWindow::OnNum5() -> void
-{
-  qDebug() << "MainWindow: 5";
-}
-
-auto MainWindow::OnNum6() -> void
-{
-  qDebug() << "MainWindow: 6";
-}
-
-auto MainWindow::OnNum7() -> void
-{
-  qDebug() << "MainWindow: 7";
-}
-
-auto MainWindow::OnNum8() -> void
-{
-  qDebug() << "MainWindow: 8";
-}
-
-auto MainWindow::OnNum9() -> void
-{
-  qDebug() << "MainWindow: 9";
-}
-
-auto MainWindow::OnPlus() -> void
-{
-  qDebug() << "MainWindow: +";
-}
-
-auto MainWindow::OnTo2Bin() -> void
-{
-  qDebug() << "MainWindow: to 0b";
-}
-
-auto MainWindow::OnToHex() -> void
-{
-  qDebug() << "MainWindow: to 0x";
+  if (!core_->SetDisplay(ui->Display)) {
+    qWarning() << "MainWindow: cannot initialize widgets!";
+  }
+  setWindowTitle("Ncalc");
+  qDebug() << "MainWindow: init";
 }
 
 auto MainWindow::Quit() -> void
@@ -141,100 +51,100 @@ void MainWindow::on_actionQuit_triggered()
 
 void MainWindow::on_Button_To2Bin_clicked()
 {
-  OnTo2Bin();
+  core_->OnTo2Bin();
 }
 
 void MainWindow::on_Button_ToHex_clicked()
 {
-  OnToHex();
+  core_->OnToHex();
 }
 
 void MainWindow::on_Button_BC_clicked()
 {
-  OnBackSpace();
+  core_->OnBackSpace();
 }
 
 void MainWindow::on_Button_C_clicked()
 {
-  OnClear();
+  core_->OnClear();
 }
 
 void MainWindow::on_Button_Devide_clicked()
 {
-  OnDevide();
+  core_->OnDevide();
 }
 
 void MainWindow::on_Button_Multiply_clicked()
 {
-  OnMultiply();
+  core_->OnMultiply();
 }
 
 void MainWindow::on_Button_Minus_clicked()
 {
-  OnMinus();
+  core_->OnMinus();
 }
 
 void MainWindow::on_Button_Plus_clicked()
 {
-  OnPlus();
+  core_->OnPlus();
 }
 
 void MainWindow::on_Button_Equal_clicked()
 {
-  OnEqual();
+  core_->OnEqual();
 }
 
 void MainWindow::on_Button_Dot_clicked()
 {
-  OnDot();
+  core_->OnDot();
 }
 
 void MainWindow::on_Button_0_clicked()
 {
-  OnNum0();
+  core_->OnNum0();
 }
 
 void MainWindow::on_Button_1_clicked()
 {
-  OnNum1();
+  core_->OnNum1();
 }
 
 void MainWindow::on_Button_2_clicked()
 {
-  OnNum2();
+  core_->OnNum2();
 }
 
 void MainWindow::on_Button_3_clicked()
 {
-  OnNum3();
+  core_->OnNum3();
 }
 
 void MainWindow::on_Button_4_clicked()
 {
-  OnNum4();
+  core_->OnNum4();
 }
 
 void MainWindow::on_Button_5_clicked()
 {
-  OnNum5();
+  core_->OnNum5();
 }
 
 void MainWindow::on_Button_6_clicked()
 {
-  OnNum6();
+  core_->OnNum6();
 }
 
 void MainWindow::on_Button_7_clicked()
 {
-  OnNum7();
+  core_->OnNum7();
 }
 
 void MainWindow::on_Button_8_clicked()
 {
-  OnNum8();
+  core_->OnNum8();
 }
 
 void MainWindow::on_Button_9_clicked()
 {
-  OnNum9();
+  core_->OnNum9();
 }

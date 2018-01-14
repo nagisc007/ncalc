@@ -23,70 +23,31 @@ class MainWindow : public QMainWindow
 public:
   explicit MainWindow(QWidget *parent = 0);
   ~MainWindow();
-  // methods
+  // methods: base
+  void InitWidgets();
   void Quit();
-  void OnTo2Bin();
-  void OnToHex();
-  void OnBackSpace();
-  void OnClear();
-  void OnDevide();
-  void OnMultiply();
-  void OnMinus();
-  void OnPlus();
-  void OnEqual();
-  void OnDot();
-  void OnNum0();
-  void OnNum1();
-  void OnNum2();
-  void OnNum3();
-  void OnNum4();
-  void OnNum5();
-  void OnNum6();
-  void OnNum7();
-  void OnNum8();
-  void OnNum9();
 
 private slots:
   void on_actionQuit_triggered();
-
   void on_Button_To2Bin_clicked();
-
   void on_Button_ToHex_clicked();
-
   void on_Button_BC_clicked();
-
   void on_Button_C_clicked();
-
   void on_Button_Devide_clicked();
-
   void on_Button_Multiply_clicked();
-
   void on_Button_Minus_clicked();
-
   void on_Button_Plus_clicked();
-
   void on_Button_Equal_clicked();
-
   void on_Button_Dot_clicked();
-
   void on_Button_0_clicked();
-
   void on_Button_1_clicked();
-
   void on_Button_2_clicked();
-
   void on_Button_3_clicked();
-
   void on_Button_4_clicked();
-
   void on_Button_5_clicked();
-
   void on_Button_6_clicked();
-
   void on_Button_7_clicked();
-
   void on_Button_8_clicked();
-
   void on_Button_9_clicked();
 
 private:
