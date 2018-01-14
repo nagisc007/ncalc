@@ -15,6 +15,7 @@ namespace NCALC {
 Core::Core(QObject *parent) : QObject(parent),
   wait_for_operand_(false),
   num_cache_(0.0),
+  factor_(OpFactor::NONE),
   display_(new QLineEdit())
 {
   qDebug() << "Core: construct";
@@ -28,9 +29,26 @@ Core::~Core()
 
 auto Core::AddOperate() -> void
 {
-  num_cache_ += display_->text().toDouble();
-  display_->setText(QString::number(num_cache_));
+  PreOperate();
+  factor_ = OpFactor::PLUS;
   wait_for_operand_ = true;
+  display_->setText(QString::number(num_cache_));
+}
+
+auto Core::ClearOperate() -> void
+{
+  num_cache_ = 0.0;
+  factor_ = OpFactor::NONE;
+  wait_for_operand_ = false;
+  display_->setText(0);
+}
+
+auto Core::DevideOperate() -> void
+{
+  PreOperate();
+  factor_ = OpFactor::DEVIDE;
+  wait_for_operand_ = true;
+  display_->setText(QString::number(num_cache_));
 }
 
 auto Core::DisplayText(int num) -> void
@@ -39,8 +57,17 @@ auto Core::DisplayText(int num) -> void
     display_->clear();
     wait_for_operand_ = false;
   }
-  display_->setText(display_->text() == "0" ? QString::number(num):
-                    display_->text() + QString::number(num));
+  auto tmp = display_->text() == "0" ? QString::number(num):
+                                       display_->text() + QString::number(num);
+  display_->setText(tmp);
+}
+
+auto Core::MultiplyOperate() -> void
+{
+  PreOperate();
+  factor_ = OpFactor::MULTI;
+  wait_for_operand_ = true;
+  display_->setText(QString::number(num_cache_));
 }
 
 auto Core::OnBackSpace() -> void
@@ -57,6 +84,7 @@ auto Core::OnClear() -> void
 auto Core::OnDevide() -> void
 {
   qDebug() << "Core: /";
+  DevideOperate();
 }
 
 auto Core::OnDot() -> void
@@ -67,16 +95,19 @@ auto Core::OnDot() -> void
 auto Core::OnEqual() -> void
 {
   qDebug() << "Core: =";
+  ShowResult();
 }
 
 auto Core::OnMinus() -> void
 {
   qDebug() << "Core: -";
+  SubtractOperate();
 }
 
 auto Core::OnMultiply() -> void
 {
   qDebug() << "Core: *";
+  MultiplyOperate();
 }
 
 auto Core::OnNum0() -> void
@@ -155,11 +186,54 @@ auto Core::OnToHex() -> void
   qDebug() << "Core: to 0x";
 }
 
+auto Core::PreOperate() -> void
+{
+  switch (factor_) {
+  case OpFactor::NONE:
+    num_cache_ = display_->text().toDouble();
+    qDebug() << "cache = " << num_cache_;
+    return;
+  case OpFactor::PLUS:{
+    auto tmp = num_cache_;
+    num_cache_ += display_->text().toDouble();
+    qDebug() << "cache = " << num_cache_ << "(" << tmp;
+    return;}
+  case OpFactor::MINUS:
+    num_cache_ -= display_->text().toDouble();
+    qDebug() << "cache = " << num_cache_;
+    return;
+  case OpFactor::MULTI:
+    num_cache_ *= display_->text().toDouble();
+    qDebug() << "cache = " << num_cache_;
+    return;
+  case OpFactor::DEVIDE:
+    num_cache_ /= display_->text().toDouble();
+    qDebug() << "cache = " << num_cache_;
+    return;
+  }
+}
+
 auto Core::SetDisplay(QLineEdit* line_edit) -> bool
 {
   display_.reset(line_edit);
   display_->setText("0");
   return !display_.isNull();
+}
+
+auto Core::ShowResult() -> void
+{
+  PreOperate();
+  factor_ = OpFactor::NONE;
+  display_->setText(QString::number(num_cache_));
+  wait_for_operand_ = false;
+}
+
+auto Core::SubtractOperate() -> void
+{
+  PreOperate();
+  factor_ = OpFactor::MINUS;
+  wait_for_operand_ = true;
+  display_->setText(QString::number(num_cache_));
 }
 
 }  // namespace NCALC

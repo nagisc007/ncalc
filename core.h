@@ -13,6 +13,14 @@
 
 namespace NCALC {
 
+enum class OpFactor {
+  NONE,
+  PLUS,
+  MINUS,
+  MULTI,
+  DEVIDE,
+};
+
 class Core : public QObject
 {
   Q_OBJECT
@@ -23,7 +31,13 @@ public:
   bool SetDisplay(QLineEdit*);
   // methods: calc
   void AddOperate();
+  void ClearOperate();
+  void DevideOperate();
   void DisplayText(int);
+  void MultiplyOperate();
+  void PreOperate();
+  void ShowResult();
+  void SubtractOperate();
   // methods: menu
   void OnTo2Bin();
   void OnToHex();
@@ -53,6 +67,7 @@ public slots:
 private:
   bool wait_for_operand_ = false;
   double num_cache_;
+  OpFactor factor_;
   QScopedPointer<QLineEdit> display_;
 };
 
