@@ -11,181 +11,201 @@
 
 namespace NCALC {
 
+/* Utils */
+auto Core::NumConverter::operator()(const QString& txt, DispMode) const -> double
+{
+  return txt.toDouble();
+}
 
+auto Core::NumConverter::operator()(double num, DispMode mode) -> QString
+{
+  if (mode == DispMode::HEX) {
+    auto tmp = static_cast<int>(num);
+    return QString("%1").arg(tmp, tmp < 0xffff ? 4: 8, 16, QLatin1Char( '0' ));
+  } else if (mode == DispMode::BIN) {
+    auto tmp = static_cast<int>(num);
+    return QString("%1").arg(tmp, tmp < 0xff ? 8: tmp < 0xffff ? 16: 32, 2, QLatin1Char( '0' ));
+  }
+  QString txt = QString::number(num);
+  return txt;
+}
+
+/* Utils: operate */
+auto Core::AddFnc::operator()(double acc, double imm) -> double
+{
+  return acc + imm;
+}
+
+auto Core::DevideFnc::operator()(double acc, double imm) -> double
+{
+  return acc / imm;
+}
+
+auto Core::MultiplyFnc::operator()(double acc, double imm) -> double
+{
+  return acc * imm;
+}
+
+auto Core::Nothing::operator()(double acc, double) -> double
+{
+  return acc;
+}
+
+auto Core::SubtractFnc::operator()(double acc, double imm) -> double
+{
+  return acc - imm;
+}
+
+auto Core::LogicalAndFnc::operator()(double acc, double imm) -> double
+{
+  return static_cast<int>(acc) & static_cast<int>(imm);
+}
+
+auto Core::LogicalNotFnc::operator()(double acc, double) -> double
+{
+  return ~static_cast<int>(acc);
+}
+
+auto Core::LogicalOrFnc::operator()(double acc, double imm) -> double
+{
+  return static_cast<int>(acc) | static_cast<int>(imm);
+}
+
+auto Core::LogicalXorFnc::operator()(double acc, double imm) -> double
+{
+  return static_cast<int>(acc) ^ static_cast<int>(imm);
+}
+
+auto Core::AppendNumToStr::operator()(double acc, int num) -> double
+{
+  QString txt = QString::number(acc);
+  txt += QString::number(num);
+  return txt.toDouble();
+}
+
+/* Core class */
 Core::Core(QObject *parent) : QObject(parent),
-  wait_for_operand_(false),
-  num_cache_(0.0),
-  factor_(OpFactor::NONE),
-  mode_(OpMode::DECIMAL),
+  acc_(0.0),
+  current_(0.0),
+  mode_(DispMode::DECIMAL),
+  table_(new QList<OpFnc>()),
   display_(new QLineEdit()),
+  display2_(new QLineEdit()),
   mode_label_(new QLabel())
 {
   qDebug() << "Core: construct";
+  if (!InitFncTable()) {
+    qWarning() << "Core: cannot create func table!";
+  }
 }
 
 Core::~Core()
 {
-  if (mode_label_) mode_label_.reset();
+  if (table_) {
+    table_->clear();
+    table_.reset();
+  }
+  if (display2_) display2_.reset();
   if (display_) display_.reset();
+  if (mode_label_) mode_label_.reset();
   qDebug() << "Core: destruct";
 }
 
-auto Core::AddOperate() -> void
+auto Core::AppendNumber(int num) -> void
 {
-  PreOperate();
-  factor_ = OpFactor::PLUS;
-  wait_for_operand_ = true;
-  display_->setText(QString::number(num_cache_));
+  auto tmp = QString::number(current_);
+
+  tmp += QString::number(num);
+  current_ = tmp.toDouble();
+  UpdateDisplay(current_, acc_, mode_);
 }
 
-auto Core::ChopText() -> void
+auto Core::AppendPoint() -> void
 {
-  auto tmp = display_->text();
+  auto tmp = QString::number(current_);
+
+  if (!tmp.contains(".")) {
+    tmp += ".";
+    current_ = tmp.toDouble();
+    UpdateDisplay(current_, acc_, mode_);
+  }
+}
+
+auto Core::ChangeMode(DispMode mode) -> void
+{
+  switch (mode) {
+  case DispMode::BIN:
+    mode_label_->setText("B");
+    break;
+  case DispMode::DECIMAL:
+    mode_label_->setText("D");
+    break;
+  case DispMode::HEX:
+    mode_label_->setText("X");
+    break;
+  }
+  mode_ = mode;
+  UpdateDisplay(current_, acc_, mode_);
+}
+
+auto Core::ChopCurrent() -> void
+{
+  auto tmp = QString::number(current_);
   tmp.chop(1);
   if (tmp.isEmpty()) {
     tmp = "0";
   }
-  display_->setText(tmp);
+  current_ = tmp.toDouble();
+  UpdateDisplay(current_, acc_, mode_);
 }
 
-auto Core::ClearOperate() -> void
+auto Core::InitFncTable() -> bool
 {
-  num_cache_ = 0.0;
-  factor_ = OpFactor::NONE;
-  wait_for_operand_ = false;
-  display_->setText("0");
-}
-
-auto Core::DevideOperate() -> void
-{
-  PreOperate();
-  factor_ = OpFactor::DEVIDE;
-  wait_for_operand_ = true;
-  display_->setText(QString::number(num_cache_));
-}
-
-auto Core::DisplayText(int num) -> void
-{
-  if (wait_for_operand_) {
-    display_->clear();
-    wait_for_operand_ = false;
+  table_->reserve(OpCodeInfo::SIZE);
+  for (int i = 0; i < OpCodeInfo::SIZE; ++i) {
+    table_->operator<<(Nothing());
   }
-  auto tmp = display_->text() == "0" ? QString::number(num):
-                                       display_->text() + QString::number(num);
-  display_->setText(tmp);
-}
+  table_->operator[](OpCode::ADD) = AddFnc();
+  table_->operator[](OpCode::DEVIDE) = DevideFnc();
+  table_->operator[](OpCode::L_AND) = LogicalAndFnc();
+  table_->operator[](OpCode::L_NOT) = LogicalNotFnc();
+  table_->operator[](OpCode::L_OR) = LogicalOrFnc();
+  table_->operator[](OpCode::L_XOR) = LogicalXorFnc();
+  table_->operator[](OpCode::MULTIPLY) = MultiplyFnc();
+  table_->operator[](OpCode::SUBTRACT) = SubtractFnc();
 
-auto Core::MultiplyOperate() -> void
-{
-  PreOperate();
-  factor_ = OpFactor::MULTI;
-  wait_for_operand_ = true;
-  display_->setText(QString::number(num_cache_));
+  return true;
 }
 
 auto Core::OnBackSpace() -> void
 {
-  qDebug() << "Core: bc";
-  ChopText();
-}
-
-auto Core::OnClear() -> void
-{
-  qDebug() << "Core: c";
-  ClearOperate();
+  ChopCurrent();
 }
 
 auto Core::OnNumber(int num) -> void
 {
-  DisplayText(num);
+  AppendNumber(num);
 }
 
-auto Core::OnOperate(OpFactor factor) -> void
+auto Core::OnOperate(OpCode) -> void
 {
-  switch (factor) {
-  case OpFactor::DEVIDE:
-    return DevideOperate();
-  case OpFactor::MINUS:
-    return SubtractOperate();
-  case OpFactor::MULTI:
-    return MultiplyOperate();
-  case OpFactor::PLUS:
-    return AddOperate();
-  case OpFactor::DOT:
-    return PointText();
-  case OpFactor::EQUAL:
-    return ShowResult();
-  case OpFactor::AND:
-    return;
-  case OpFactor::NOT:
-    return;
-  case OpFactor::XOR:
-    return;
-  case OpFactor::OR:
-    return;
-  case OpFactor::NONE:
-    return;
-  }
+
 }
 
-auto Core::OnOperate(OpMode mode) -> void
+auto Core::Reset() -> void
 {
-  mode_ = mode;
-  mode_label_->setText(mode == OpMode::BIT ? "B":
-                                             mode == OpMode::HEX ? "X": "D");
+  acc_ = 0.0;
+  current_ = 0.0;
+  UpdateDisplay(current_, acc_, mode_);
 }
 
-auto Core::PointText() -> void
+auto Core::SetDisplay(QLineEdit* main, QLineEdit* sub) -> bool
 {
-  if (!display_->text().contains(".")) {
-    display_->setText(display_->text() + ".");
-  }
-}
-
-auto Core::PreOperate() -> void
-{
-  switch (factor_) {
-  case OpFactor::NONE:
-    num_cache_ = display_->text().toDouble();
-    qDebug() << "cache = " << num_cache_;
-    return;
-  case OpFactor::PLUS:{
-    auto tmp = num_cache_;
-    num_cache_ += display_->text().toDouble();
-    qDebug() << "cache = " << num_cache_ << "(" << tmp;
-    return;}
-  case OpFactor::MINUS:
-    num_cache_ -= display_->text().toDouble();
-    qDebug() << "cache = " << num_cache_;
-    return;
-  case OpFactor::MULTI:
-    num_cache_ *= display_->text().toDouble();
-    qDebug() << "cache = " << num_cache_;
-    return;
-  case OpFactor::DEVIDE:
-    num_cache_ /= display_->text().toDouble();
-    qDebug() << "cache = " << num_cache_;
-    return;
-  case OpFactor::EQUAL:
-    return;
-  case OpFactor::AND:
-    return;
-  case OpFactor::DOT:
-    return;
-  case OpFactor::NOT:
-    return;
-  case OpFactor::OR:
-    return;
-  case OpFactor::XOR:
-    return;
-  }
-}
-
-auto Core::SetDisplay(QLineEdit* line_edit) -> bool
-{
-  display_.reset(line_edit);
-  if (display_.isNull()) return false;
+  display_.reset(main);
+  display2_.reset(sub);
+  if (display_.isNull() || display2_.isNull()) return false;
   display_->setText("0");
+  display2_->setText("0");
   return true;
 }
 
@@ -194,23 +214,14 @@ auto Core::SetModeLabel(QLabel* label) -> bool
   mode_label_.reset(label);
   if (mode_label_.isNull()) return false;
   mode_label_->setText("D");
+  mode_ = DispMode::DECIMAL;
   return true;
 }
 
-auto Core::ShowResult() -> void
+auto Core::UpdateDisplay(double current, double acc, DispMode mode) -> void
 {
-  PreOperate();
-  factor_ = OpFactor::NONE;
-  display_->setText(QString::number(num_cache_));
-  wait_for_operand_ = false;
-}
-
-auto Core::SubtractOperate() -> void
-{
-  PreOperate();
-  factor_ = OpFactor::MINUS;
-  wait_for_operand_ = true;
-  display_->setText(QString::number(num_cache_));
+  display_->setText(NumConverter()(current, mode));
+  display2_->setText(NumConverter()(acc, mode));
 }
 
 }  // namespace NCALC

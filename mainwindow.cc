@@ -18,6 +18,9 @@ MainWindow::MainWindow(QWidget *parent) :
   ui->setupUi(this);
   qDebug() << "MainWindow: construct";
   InitWidgets();
+  // connects
+  connect(core_.data(), &NCALC::Core::failed, this, &MainWindow::OnCatchFailure);
+  core_->Reset();
 }
 
 MainWindow::~MainWindow()
@@ -29,7 +32,7 @@ MainWindow::~MainWindow()
 
 auto MainWindow::InitWidgets() -> void
 {
-  if (!core_->SetDisplay(ui->Display) ||
+  if (!core_->SetDisplay(ui->Display, ui->Display_Sub) ||
       !core_->SetModeLabel(ui->ModeLabel)) {
     qWarning() << "MainWindow: cannot initialize widgets!";
   }
@@ -45,6 +48,15 @@ auto MainWindow::Quit() -> void
 /*
  * slots
  */
+void MainWindow::OnCatchFailure(const QString& msg)
+{
+  qWarning() << "MainWindow: catch error: " << msg;
+  close();
+}
+
+/*
+ * slots: menus
+ */
 void MainWindow::on_actionQuit_triggered()
 {
   Quit();
@@ -52,12 +64,12 @@ void MainWindow::on_actionQuit_triggered()
 
 void MainWindow::on_Button_To2Bin_clicked()
 {
-  core_->OnOperate(NCALC::OpMode::BIT);
+  core_->ChangeMode(NCALC::DispMode::BIN);
 }
 
 void MainWindow::on_Button_ToHex_clicked()
 {
-  core_->OnOperate(NCALC::OpMode::HEX);
+  core_->ChangeMode(NCALC::DispMode::HEX);
 }
 
 void MainWindow::on_Button_BC_clicked()
@@ -67,37 +79,36 @@ void MainWindow::on_Button_BC_clicked()
 
 void MainWindow::on_Button_C_clicked()
 {
-  core_->OnClear();
+  core_->Reset();
 }
 
 void MainWindow::on_Button_Devide_clicked()
 {
-  core_->OnOperate(NCALC::OpFactor::DEVIDE);
+  core_->OnOperate(NCALC::OpCode::DEVIDE);
 }
 
 void MainWindow::on_Button_Multiply_clicked()
 {
-  core_->OnOperate(NCALC::OpFactor::MULTI);
+  core_->OnOperate(NCALC::OpCode::MULTIPLY);
 }
 
 void MainWindow::on_Button_Minus_clicked()
 {
-  core_->OnOperate(NCALC::OpFactor::MINUS);
+  core_->OnOperate(NCALC::OpCode::SUBTRACT);
 }
 
 void MainWindow::on_Button_Plus_clicked()
 {
-  core_->OnOperate(NCALC::OpFactor::PLUS);
+  core_->OnOperate(NCALC::OpCode::ADD);
 }
 
 void MainWindow::on_Button_Equal_clicked()
 {
-  core_->OnOperate(NCALC::OpFactor::EQUAL);
 }
 
 void MainWindow::on_Button_Dot_clicked()
 {
-  core_->OnOperate(NCALC::OpFactor::DOT);
+  core_->AppendPoint();
 }
 
 void MainWindow::on_Button_0_clicked()
@@ -152,25 +163,25 @@ void MainWindow::on_Button_9_clicked()
 
 void MainWindow::on_Button_ToDecimal_clicked()
 {
-  core_->OnOperate(NCALC::OpMode::DECIMAL);
+  core_->ChangeMode(NCALC::DispMode::DECIMAL);
 }
 
 void MainWindow::on_Button_And_clicked()
 {
-  core_->OnOperate(NCALC::OpFactor::AND);
+  core_->OnOperate(NCALC::OpCode::L_AND);
 }
 
 void MainWindow::on_Button_Or_clicked()
 {
-  core_->OnOperate(NCALC::OpFactor::OR);
+  core_->OnOperate(NCALC::OpCode::L_OR);
 }
 
 void MainWindow::on_Button_Not_clicked()
 {
-  core_->OnOperate(NCALC::OpFactor::NOT);
+  core_->OnOperate(NCALC::L_NOT);
 }
 
 void MainWindow::on_Button_Xor_clicked()
 {
-  core_->OnOperate(NCALC::OpFactor::XOR);
+  core_->OnOperate(NCALC::OpCode::L_XOR);
 }
