@@ -12,12 +12,7 @@
 namespace NCALC {
 
 /* Utils */
-auto Core::NumConverter::operator()(const QString& txt, DispMode) const -> double
-{
-  return txt.toDouble();
-}
-
-auto Core::NumConverter::operator()(double num, DispMode mode) -> QString
+auto Core::NumConverter::operator()(double num, DispMode mode) const -> QString
 {
   if (mode == DispMode::HEX) {
     auto tmp = static_cast<int>(num);
@@ -25,9 +20,22 @@ auto Core::NumConverter::operator()(double num, DispMode mode) -> QString
   } else if (mode == DispMode::BIN) {
     auto tmp = static_cast<int>(num);
     return QString("%1").arg(tmp, tmp < 0xff ? 8: tmp < 0xffff ? 16: 32, 2, QLatin1Char( '0' ));
+  } else {
+    return QString::number(num);
   }
-  QString txt = QString::number(num);
-  return txt;
+}
+
+auto Core::NumConverter::operator()(const QString& num, DispMode mode) const -> QString
+{
+  if (mode == DispMode::HEX) {
+    auto tmp = static_cast<int>(num.toDouble());
+    return QString("%1").arg(tmp, tmp < 0xffff ? 4: 8, 16, QLatin1Char( '0' ));
+  } else if (mode == DispMode::BIN) {
+    auto tmp = static_cast<int>(num.toDouble());
+    return QString("%1").arg(tmp, tmp < 0xff ? 8: tmp < 0xffff ? 16: 32, 2, QLatin1Char( '0' ));
+  } else {
+    return num;
+  }
 }
 
 /* Utils: operate */
@@ -76,17 +84,10 @@ auto Core::LogicalXorFnc::operator()(double acc, double imm) -> double
   return static_cast<int>(acc) ^ static_cast<int>(imm);
 }
 
-auto Core::AppendNumToStr::operator()(double acc, int num) -> double
-{
-  QString txt = QString::number(acc);
-  txt += QString::number(num);
-  return txt.toDouble();
-}
-
 /* Core class */
 Core::Core(QObject *parent) : QObject(parent),
   acc_(0.0),
-  current_(0.0),
+  current_("0"),
   mode_(DispMode::DECIMAL),
   table_(new QList<OpFnc>()),
   stack_(new QStack<OpFnc>()),
@@ -118,20 +119,15 @@ Core::~Core()
 
 auto Core::AppendNumber(int num) -> void
 {
-  auto tmp = QString::number(current_);
-
-  tmp += QString::number(num);
-  current_ = tmp.toDouble();
+  current_ = current_.toDouble() == 0.0 ? QString::number(num):
+                                          current_ + QString::number(num);
   UpdateDisplay(current_, acc_, mode_);
 }
 
 auto Core::AppendPoint() -> void
 {
-  auto tmp = QString::number(current_);
-
-  if (!tmp.contains(".")) {
-    tmp += ".";
-    current_ = tmp.toDouble();
+  if (!current_.contains(".")) {
+    current_ += ".";
     UpdateDisplay(current_, acc_, mode_);
   }
 }
@@ -155,12 +151,10 @@ auto Core::ChangeMode(DispMode mode) -> void
 
 auto Core::ChopCurrent() -> void
 {
-  auto tmp = QString::number(current_);
-  tmp.chop(1);
-  if (tmp.isEmpty()) {
-    tmp = "0";
+  current_.chop(1);
+  if (current_.isEmpty()) {
+    current_ = "0";
   }
-  current_ = tmp.toDouble();
   UpdateDisplay(current_, acc_, mode_);
 }
 
@@ -196,17 +190,17 @@ auto Core::OnOperate(OpCode code) -> void
 {
   if (!stack_->isEmpty()) {
     auto opcode = stack_->pop();
-    acc_ = opcode(acc_, current_);
+    acc_ = opcode(acc_, current_.toDouble());
     UpdateDisplay(current_, acc_, mode_);
   }
-  current_ = 0.0;
+  current_ = "0";
   stack_->push(table_->at(code));
 }
 
 auto Core::Reset() -> void
 {
   acc_ = 0.0;
-  current_ = 0.0;
+  current_ = "0";
   stack_->clear();
   stack_->push(table_->at(OpCode::NOP));
   UpdateDisplay(current_, acc_, mode_);
@@ -231,7 +225,7 @@ auto Core::SetModeLabel(QLabel* label) -> bool
   return true;
 }
 
-auto Core::UpdateDisplay(double current, double acc, DispMode mode) -> void
+auto Core::UpdateDisplay(const QString& current, double acc, DispMode mode) -> void
 {
   display_->setText(NumConverter()(current, mode));
   display2_->setText(NumConverter()(acc, mode));

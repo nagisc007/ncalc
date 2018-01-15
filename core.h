@@ -49,8 +49,8 @@ public:
   // utils
   class NumConverter {
   public:
-    double operator()(const QString&, DispMode) const;
-    QString operator()(double, DispMode);
+    QString operator()(double, DispMode) const;
+    QString operator()(const QString&, DispMode) const;
   };
   // utils: operate
   class Nothing {
@@ -89,10 +89,6 @@ public:
   public:
     double operator()(double, double);
   };
-  class AppendNumToStr {
-  public:
-    double operator()(double, int);
-  };
   // methods: base
   bool InitFncTable();
   bool SetDisplay(QLineEdit*, QLineEdit*);
@@ -104,7 +100,7 @@ public:
   // methods
   void ChangeMode(DispMode);
   void Reset();
-  void UpdateDisplay(double, double, DispMode);
+  void UpdateDisplay(const QString&, double, DispMode);
   // methods: menu
   void OnBackSpace();
   void OnClear();
@@ -118,7 +114,7 @@ public slots:
 
 private:
   double acc_;
-  double current_;
+  QString current_;
   DispMode mode_;
   QScopedPointer<QList<OpFnc>> table_;
   QScopedPointer<QStack<OpFnc>> stack_;
