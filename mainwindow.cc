@@ -9,6 +9,7 @@
 #include "ui_mainwindow.h"
 
 #include <QDebug>
+#include <QMessageBox>
 
 MainWindow::MainWindow(QWidget *parent) :
   QMainWindow(parent),
@@ -185,4 +186,16 @@ void MainWindow::on_Button_Not_clicked()
 void MainWindow::on_Button_Xor_clicked()
 {
   core_->OnOperate(NCALC::OpCode::L_XOR);
+}
+
+void MainWindow::on_actionAbout_Qt_triggered()
+{
+  QMessageBox::aboutQt(this);
+}
+
+void MainWindow::on_actionAbout_App_triggered()
+{
+  QString title = "About Ncalc";
+  QString msg = "<h3>About Ncalc</h3><p>Ncalc is a simple calculator by Qt.<br>Licensed by GNU GENERAL PUBLIC LICENSE Version 3.</p><p>Copyright (c) 2018 N.T.Works</p>";
+  QMessageBox::about(this, title, msg);
 }

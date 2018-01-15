@@ -58,6 +58,10 @@ private slots:
   void on_Button_Not_clicked();
   void on_Button_Xor_clicked();
 
+  void on_actionAbout_Qt_triggered();
+
+  void on_actionAbout_App_triggered();
+
 private:
   Ui::MainWindow *ui;
   QScopedPointer<NCALC::Core> core_;
