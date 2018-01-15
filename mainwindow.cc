@@ -104,6 +104,7 @@ void MainWindow::on_Button_Plus_clicked()
 
 void MainWindow::on_Button_Equal_clicked()
 {
+  core_->OnOperate(NCALC::OpCode::NOP);
 }
 
 void MainWindow::on_Button_Dot_clicked()
