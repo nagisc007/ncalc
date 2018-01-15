@@ -46,9 +46,9 @@ auto Core::MultiplyFnc::operator()(double acc, double imm) -> double
   return acc * imm;
 }
 
-auto Core::Nothing::operator()(double acc, double) -> double
+auto Core::Nothing::operator()(double, double imm) -> double
 {
-  return acc;
+  return imm;
 }
 
 auto Core::SubtractFnc::operator()(double acc, double imm) -> double
@@ -89,6 +89,7 @@ Core::Core(QObject *parent) : QObject(parent),
   current_(0.0),
   mode_(DispMode::DECIMAL),
   table_(new QList<OpFnc>()),
+  stack_(new QStack<OpFnc>()),
   display_(new QLineEdit()),
   display2_(new QLineEdit()),
   mode_label_(new QLabel())
@@ -101,6 +102,10 @@ Core::Core(QObject *parent) : QObject(parent),
 
 Core::~Core()
 {
+  if (stack_) {
+    stack_->clear();
+    stack_.reset();
+  }
   if (table_) {
     table_->clear();
     table_.reset();
@@ -187,15 +192,23 @@ auto Core::OnNumber(int num) -> void
   AppendNumber(num);
 }
 
-auto Core::OnOperate(OpCode) -> void
+auto Core::OnOperate(OpCode code) -> void
 {
-
+  if (!stack_->isEmpty()) {
+    auto opcode = stack_->pop();
+    acc_ = opcode(acc_, current_);
+    UpdateDisplay(current_, acc_, mode_);
+  }
+  current_ = 0.0;
+  stack_->push(table_->at(code));
 }
 
 auto Core::Reset() -> void
 {
   acc_ = 0.0;
   current_ = 0.0;
+  stack_->clear();
+  stack_->push(table_->at(OpCode::NOP));
   UpdateDisplay(current_, acc_, mode_);
 }
 

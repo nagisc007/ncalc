@@ -12,6 +12,7 @@
 #include <QList>
 #include <QLineEdit>
 #include <QObject>
+#include <QStack>
 
 namespace NCALC {
 
@@ -120,6 +121,7 @@ private:
   double current_;
   DispMode mode_;
   QScopedPointer<QList<OpFnc>> table_;
+  QScopedPointer<QStack<OpFnc>> stack_;
   QScopedPointer<QLineEdit> display_;
   QScopedPointer<QLineEdit> display2_;
   QScopedPointer<QLabel> mode_label_;
