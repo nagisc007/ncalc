@@ -5,15 +5,28 @@
  *   Licensed under GPLv3                                                  *
  *                                                                         *
  ***************************************************************************/
-#include "mainwindow.h"
-#include <QApplication>
+#ifndef MEM_H
+#define MEM_H
 
-int main(int argc, char *argv[])
+#include "common_types.h"
+#include <atomic>
+
+namespace NCALC {
+
+class Mem
 {
-  qSetMessagePattern("[%{time h:mm:ss.zzz} %{if-debug}DEBG%{endif}%{if-info}INFO%{endif}%{if-warning}WARN%{endif}%{if-critical}CRIT%{endif}%{if-fatal}FATL%{endif}] %{file}:%{line} - %{message}");
-  QApplication a(argc, argv);
-  MainWindow w;
-  w.show();
+public:
+  Mem();
+  // members
+  std::array<std::atomic<double>, RegSize> m_reg0{};
+  std::array<std::atomic<int>, StateSize> m_reg1{};
+  // methods
+  double ToRegRead(T_reg_addr);
+  void ToRegWrite(T_reg_addr, double);
+  int ToStateRead(T_stat_addr);
+  void ToStateWrite(T_stat_addr, int);
+};
 
-  return a.exec();
-}
+}  // ns NCALC
+
+#endif // MEM_H

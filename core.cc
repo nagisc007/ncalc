@@ -2,233 +2,219 @@
  *                                                                         *
  *   Copyright (C) 2018 by N.T.WORKS                                       *
  *                                                                         *
- *   Licensed under GPLv2 or any later version                             *
+ *   Licensed under GPLv3                                                  *
  *                                                                         *
  ***************************************************************************/
 #include "core.h"
 
 #include <QDebug>
+#include <QtMath>
 
 namespace NCALC {
 
-/* Utils */
-auto Core::NumConverter::operator()(double num, DispMode mode) const -> QString
-{
-  if (mode == DispMode::HEX) {
-    auto tmp = static_cast<int>(num);
-    return QString("%1").arg(tmp, tmp < 0xffff ? 4: 8, 16, QLatin1Char( '0' ));
-  } else if (mode == DispMode::BIN) {
-    auto tmp = static_cast<int>(num);
-    return QString("%1").arg(tmp, tmp < 0xff ? 8: tmp < 0xffff ? 16: 32, 2, QLatin1Char( '0' ));
-  } else {
-    return QString::number(num);
-  }
-}
-
-auto Core::NumConverter::operator()(const QString& num, DispMode mode) const -> QString
-{
-  if (mode == DispMode::HEX) {
-    auto tmp = static_cast<int>(num.toDouble());
-    return QString("%1").arg(tmp, tmp < 0xffff ? 4: 8, 16, QLatin1Char( '0' ));
-  } else if (mode == DispMode::BIN) {
-    auto tmp = static_cast<int>(num.toDouble());
-    return QString("%1").arg(tmp, tmp < 0xff ? 8: tmp < 0xffff ? 16: 32, 2, QLatin1Char( '0' ));
-  } else {
-    return num;
-  }
-}
-
-/* Utils: operate */
-auto Core::AddFnc::operator()(double acc, double imm) -> double
-{
-  return acc + imm;
-}
-
-auto Core::DevideFnc::operator()(double acc, double imm) -> double
-{
-  return acc / imm;
-}
-
-auto Core::MultiplyFnc::operator()(double acc, double imm) -> double
-{
-  return acc * imm;
-}
-
-auto Core::Nothing::operator()(double, double imm) -> double
-{
-  return imm;
-}
-
-auto Core::SubtractFnc::operator()(double acc, double imm) -> double
-{
-  return acc - imm;
-}
-
-auto Core::LogicalAndFnc::operator()(double acc, double imm) -> double
-{
-  return static_cast<int>(acc) & static_cast<int>(imm);
-}
-
-auto Core::LogicalNotFnc::operator()(double acc, double) -> double
-{
-  return ~static_cast<int>(acc);
-}
-
-auto Core::LogicalOrFnc::operator()(double acc, double imm) -> double
-{
-  return static_cast<int>(acc) | static_cast<int>(imm);
-}
-
-auto Core::LogicalXorFnc::operator()(double acc, double imm) -> double
-{
-  return static_cast<int>(acc) ^ static_cast<int>(imm);
-}
-
-/* Core class */
+/* class: Core */
 Core::Core(QObject *parent) : QObject(parent),
-  acc_(0.0),
-  current_("0"),
-  mode_(DispMode::DECIMAL),
-  table_(new QList<OpFnc>()),
-  stack_(new QStack<OpFnc>()),
-  display_(new QLineEdit()),
-  display2_(new QLineEdit()),
-  mode_label_(new QLabel())
+  m_calc_ops(new QVector<OpFnc>(OpCodeSize)),
+  m_stack(new QStack<OpSet>()),
+  m_stack_of_redo(new QStack<OpSet>())
 {
+  cur_min_pos = 0;
+  m_stack->push(qMakePair(0.0, 0.0));
   qDebug() << "Core: construct";
-  if (!InitFncTable()) {
+  if (!InitOperationTable()) {
     qWarning() << "Core: cannot create func table!";
   }
 }
 
 Core::~Core()
 {
-  if (stack_) {
-    stack_->clear();
-    stack_.reset();
+  if (m_stack) {
+    m_stack->clear();
+    m_stack.reset();
   }
-  if (table_) {
-    table_->clear();
-    table_.reset();
+  if (m_stack_of_redo) {
+    m_stack_of_redo->clear();
+    m_stack_of_redo.reset();
   }
-  if (display2_) display2_.reset();
-  if (display_) display_.reset();
-  if (mode_label_) mode_label_.reset();
+  if (m_calc_ops) {
+    m_calc_ops->clear();
+    m_calc_ops.reset();
+  }
   qDebug() << "Core: destruct";
 }
 
-auto Core::AppendNumber(int num) -> void
+/* base */
+auto Core::InitOperationTable() -> bool
 {
-  current_ = current_.toDouble() == 0.0 ? QString::number(num):
-                                          current_ + QString::number(num);
-  UpdateDisplay(current_, acc_, mode_);
+  for (int i = 0, size = m_calc_ops->size(); i < size; ++i) {
+    (*m_calc_ops)[i] = [](double, double){return 0.0;};
+  }
+  (*m_calc_ops)[static_cast<int>(OpCode::Add)] = [](double a, double b){return a + b;};
+  (*m_calc_ops)[static_cast<int>(OpCode::Subtract)] = [](double a, double b){return a - b;};
+  (*m_calc_ops)[static_cast<int>(OpCode::Multiply)] = [](double a, double b){return a * b;};
+  (*m_calc_ops)[static_cast<int>(OpCode::Devide)] = [](double a, double b){return a / b;};
+  (*m_calc_ops)[static_cast<int>(OpCode::And)] = [](double a, double b){
+    return static_cast<double>(static_cast<int>(a) & static_cast<int>(b));};
+  (*m_calc_ops)[static_cast<int>(OpCode::Or)] = [](double a, double b){
+    return static_cast<double>(static_cast<int>(a) | static_cast<int>(b));};
+  (*m_calc_ops)[static_cast<int>(OpCode::Xor)] = [](double a, double b){
+    return static_cast<double>(static_cast<int>(a) ^ static_cast<int>(b));};
+  (*m_calc_ops)[static_cast<int>(OpCode::Not)] = [](double a, double){
+    return static_cast<double>(~static_cast<int>(a));};
+  return true;
 }
 
-auto Core::AppendPoint() -> void
+auto Core::SetMemoryRef(Mem* m) -> bool
 {
-  if (!current_.contains(".")) {
-    current_ += ".";
-    UpdateDisplay(current_, acc_, mode_);
-  }
-}
+  if (m == nullptr) return false;
 
-auto Core::ChangeMode(DispMode mode) -> void
-{
-  switch (mode) {
-  case DispMode::BIN:
-    mode_label_->setText("B");
-    break;
-  case DispMode::DECIMAL:
-    mode_label_->setText("D");
-    break;
-  case DispMode::HEX:
-    mode_label_->setText("X");
-    break;
-  }
-  mode_ = mode;
-  UpdateDisplay(current_, acc_, mode_);
-}
-
-auto Core::ChopCurrent() -> void
-{
-  current_.chop(1);
-  if (current_.isEmpty()) {
-    current_ = "0";
-  }
-  UpdateDisplay(current_, acc_, mode_);
-}
-
-auto Core::InitFncTable() -> bool
-{
-  table_->reserve(OpCodeInfo::SIZE);
-  for (int i = 0; i < OpCodeInfo::SIZE; ++i) {
-    table_->operator<<(Nothing());
-  }
-  table_->operator[](OpCode::ADD) = AddFnc();
-  table_->operator[](OpCode::DEVIDE) = DevideFnc();
-  table_->operator[](OpCode::L_AND) = LogicalAndFnc();
-  table_->operator[](OpCode::L_NOT) = LogicalNotFnc();
-  table_->operator[](OpCode::L_OR) = LogicalOrFnc();
-  table_->operator[](OpCode::L_XOR) = LogicalXorFnc();
-  table_->operator[](OpCode::MULTIPLY) = MultiplyFnc();
-  table_->operator[](OpCode::SUBTRACT) = SubtractFnc();
+  r_mem = m;
 
   return true;
 }
 
-auto Core::OnBackSpace() -> void
+/* methods */
+auto Core::ToReset() -> void
 {
-  ChopCurrent();
+  r_mem->ToRegWrite(Reg::ACC, 0.0);
+  r_mem->ToRegWrite(Reg::INPUT, 0.0);
+  r_mem->ToStateWrite(State::NumType, static_cast<int>(NumType::Int));
+  cur_min_pos = 0;
+  m_stack->clear();
+  m_stack_of_redo->clear();
+  emit ToMWin();
 }
 
-auto Core::OnNumber(int num) -> void
+auto Core::ToClear() -> void
 {
-  AppendNumber(num);
+  ToStack(r_mem->ToRegRead(Reg::ACC), r_mem->ToRegRead(Reg::INPUT));
+
+  r_mem->ToRegWrite(Reg::INPUT, 0.0);
+  cur_min_pos = 0;
+  emit ToMWin();
 }
 
-auto Core::OnOperate(OpCode code) -> void
+auto Core::ToUndo() -> void
 {
-  if (!stack_->isEmpty()) {
-    auto opcode = stack_->pop();
-    acc_ = opcode(acc_, current_.toDouble());
-    UpdateDisplay(current_, acc_, mode_);
+  if (m_stack->isEmpty()) return;
+
+  auto stack = m_stack->pop();
+  auto acc_val = stack.first;
+  auto input_val = stack.second;
+  m_stack_of_redo->push(qMakePair(r_mem->ToRegRead(Reg::ACC), r_mem->ToRegRead(Reg::INPUT)));
+
+  r_mem->ToRegWrite(Reg::ACC, acc_val);
+  r_mem->ToRegWrite(Reg::INPUT, input_val);
+  emit ToMWin();
+}
+
+auto Core::ToRedo() -> void
+{
+  if (m_stack_of_redo->isEmpty()) return;
+
+  auto stack = m_stack_of_redo->pop();
+  auto acc_val = stack.first;
+  auto input_val = stack.second;
+  m_stack->push(qMakePair(r_mem->ToRegRead(Reg::ACC), r_mem->ToRegRead(Reg::INPUT)));
+
+  r_mem->ToRegWrite(Reg::ACC, acc_val);
+  r_mem->ToRegWrite(Reg::INPUT, input_val);
+  emit ToMWin();
+}
+
+auto Core::ToCalc(T_opcode opcode) -> void
+{
+  auto acc_val = r_mem->ToRegRead(Reg::ACC);
+  auto input_val = r_mem->ToRegRead(Reg::INPUT);
+  ToStack(acc_val, input_val);
+
+  auto result_val = m_calc_ops->at(static_cast<int>(opcode))(acc_val, input_val);
+  r_mem->ToRegWrite(Reg::ACC, result_val);
+  r_mem->ToRegWrite(Reg::INPUT, 0.0);
+  cur_min_pos = 0;
+  emit ToMWin();
+}
+
+auto Core::ToRegs(T_arg arg) -> void
+{
+  auto acc_val = r_mem->ToRegRead(Reg::ACC);
+  auto input_val = r_mem->ToRegRead(Reg::INPUT);
+  ToStack(acc_val, input_val);
+
+  if (qFuzzyCompare(input_val, 0.0000)) {
+    r_mem->ToRegWrite(Reg::INPUT, arg.toDouble());
+  } else {
+    r_mem->ToRegWrite(Reg::INPUT, ToCombine(input_val, arg.toDouble()));
   }
-  current_ = "0";
-  stack_->push(table_->at(code));
+  emit ToMWin();
 }
 
-auto Core::Reset() -> void
+auto Core::ToChangeType() -> void
 {
-  acc_ = 0.0;
-  current_ = "0";
-  stack_->clear();
-  stack_->push(table_->at(OpCode::NOP));
-  UpdateDisplay(current_, acc_, mode_);
+  auto type = static_cast<NumType>(r_mem->ToStateRead(State::NumType));
+  if (type == NumType::Int) {
+    r_mem->ToStateWrite(State::NumType, static_cast<int>(NumType::Float));
+    emit ToMWin();
+  }
 }
 
-auto Core::SetDisplay(QLineEdit* main, QLineEdit* sub) -> bool
+auto Core::ToChangeDigit() -> void
 {
-  display_.reset(main);
-  display2_.reset(sub);
-  if (display_.isNull() || display2_.isNull()) return false;
-  display_->setText("0");
-  display2_->setText("0");
-  return true;
+  auto cur_digit = static_cast<Digit>(r_mem->ToStateRead(State::Digit));
+  r_mem->ToStateWrite(State::Digit, static_cast<Digit>(cur_digit) == Digit::DECIMAL ?
+                        static_cast<int>(Digit::HEXADECIMAL):
+                        static_cast<int>(Digit::DECIMAL));
+  emit ToMWin();
 }
 
-auto Core::SetModeLabel(QLabel* label) -> bool
+auto Core::ToCombine(double a, double b) -> double
 {
-  mode_label_.reset(label);
-  if (mode_label_.isNull()) return false;
-  mode_label_->setText("D");
-  mode_ = DispMode::DECIMAL;
-  return true;
+  auto type = static_cast<NumType>(r_mem->ToStateRead(State::NumType));
+  auto digit = static_cast<Digit>(r_mem->ToStateRead(State::Digit));
+
+  if (type == NumType::Float) {
+    ++cur_min_pos;
+    return digit == Digit::DECIMAL ? a + b / qPow(10, cur_min_pos): a + b / qPow(16, cur_min_pos);
+  } else {
+    return digit == Digit::DECIMAL ? a * 10 + b: a * 16 + b;
+  }
 }
 
-auto Core::UpdateDisplay(const QString& current, double acc, DispMode mode) -> void
+auto Core::ToStack(double acc, double input) -> void
 {
-  display_->setText(NumConverter()(current, mode));
-  display2_->setText(NumConverter()(acc, mode));
+  m_stack->push(qMakePair(acc, input));
+  m_stack_of_redo->clear();
+}
+
+/* slots */
+void Core::FromMWin(T_opcode opcode, T_arg arg)
+{
+  switch (opcode) {
+  case OpCode::Store:
+    ToRegs(arg);
+    break;
+  case OpCode::StoreDot:
+    ToChangeType();
+    break;
+  case OpCode::Reset:
+    ToReset();
+    break;
+  case OpCode::Clear:
+    ToClear();
+    break;
+  case OpCode::ChangeDigit:
+    ToChangeDigit();
+    break;
+  case OpCode::Undo:
+    ToUndo();
+    break;
+  case OpCode::Redo:
+    ToRedo();
+    break;
+  default:
+    ToCalc(opcode);
+    break;
+  }
 }
 
 }  // namespace NCALC
