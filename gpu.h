@@ -5,56 +5,42 @@
  *   Licensed under GPLv3                                                  *
  *                                                                         *
  ***************************************************************************/
-#ifndef CORE_H
-#define CORE_H
+#ifndef GPU_H
+#define GPU_H
 
 #include "common_types.h"
-#include "mem.h"
 
 #include <QObject>
-#include <QStack>
 #include <QVector>
-#include <QPair>
 
-namespace NCALC {
+namespace GPU {
 
-using OpFnc = std::function<double(double, double)>;
-using OpSet = QPair<double, double>;
+enum class VramAddr {
+  DIGIT,
+};
+
+using T_vram_addr = VramAddr;
 
 class Core : public QObject
 {
   Q_OBJECT
 public:
   explicit Core(QObject *parent = nullptr);
-  ~Core();
   // members
-  Mem* r_mem;
-  QScopedPointer<QVector<OpFnc>> m_calc_ops;
-  int cur_min_pos;
-  QScopedPointer<QStack<OpSet>> m_stack;
-  QScopedPointer<QStack<OpSet>> m_stack_of_redo;
-  // base
-  bool InitOperationTable();
-  bool SetMemoryRef(Mem*);
+  QVector<int> vram;
   // methods
-  void ToReset();
-  void ToClear();
-  void ToChangeDigit();
-  void ToCalc(T_opcode);
-  void ToRegs(T_arg);
-  void ToChangeType();
-  void ToUndo();
-  void ToRedo();
-  double ToCombine(double, double);
-  void ToStack(double, double);
+  void Reset();
+  // - vram
+  int ReadVram(T_vram_addr);
+  void WriteVram(T_vram_addr, int);
 
 signals:
-  void ToMWin();
+  void ToDisplay(T_dev_addr, T_str);
 
 public slots:
-  void FromMWin(T_opcode, T_arg);
+  void FromCpu(T_bits, T_base_num, T_base_num);
 };
 
-}  // namespace NCALC
+}  // ns GPU
 
-#endif // CORE_H
+#endif // GPU_H

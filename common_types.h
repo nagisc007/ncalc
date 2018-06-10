@@ -9,46 +9,69 @@
 #define COMMON_TYPES_H
 
 #include <QtGlobal>
+#include <QString>
 #include <QVariant>
 
-enum class OpCode {
+namespace CPU {
+
+enum class Addr {
+  NUM = 0x01,
+  CMD = 0x02,
+};
+
+enum class NumButton {
+  NUM_0,
+  NUM_1, NUM_2, NUM_3,
+  NUM_4, NUM_5, NUM_6,
+  NUM_7, NUM_8, NUM_9,
+  NUM_A, NUM_B, NUM_C,
+  NUM_D, NUM_E, NUM_F,
+  NUM_DOT,
+};
+
+enum class CmdButton {
   NOP,
-  Reset,
-  Add, Subtract, Multiply, Devide,
-  And, Or, Xor, Not,
-  Return,
-  Clear, Undo, Redo,
-  ChangeDigit,
-  Store, StoreDot,
-};
-constexpr int OpCodeSize = static_cast<int>(OpCode::StoreDot) + 1;
-
-enum class Digit {
-  DECIMAL,
-  HEXADECIMAL,
+  ADD, SUBTRACT, MULTIPLY, DIVIDE,
+  AND, OR, XOR, NOT,
+  CLEAR_INPUT, CLEAR_ALL,
+  REDO, UNDO,
+  CHANGE_DIGIT,
 };
 
-enum class NumType {
-  Int,
-  Float,
+}  // ns CPU
+
+namespace GPU {
+
+enum class Addr {
+  DIGIT = 0x01,
+  CMD = 0x02,
+  INPUT = 0x04,
+  RESULT = 0x08,
+  ALL = DIGIT | CMD | INPUT | RESULT,
 };
 
-enum class Reg {
-  ACC,
-  INPUT,
-};
-constexpr int RegSize = static_cast<int>(Reg::INPUT) + 1;
+}  // ns GPU
 
-enum class State {
-  NumType,
-  Digit,
-};
-constexpr int StateSize = static_cast<int>(State::Digit) + 1;
+namespace DEV {
 
-using T_opcode = OpCode;
-using T_addr = int;
-using T_arg = QVariant;
-using T_reg_addr = Reg;
-using T_stat_addr = State;
+enum class Addr {
+  RESULT = 0x01,
+  INPUT = 0x02,
+  DIGIT = 0x04,
+  CMD = 0x08,
+  ALL = RESULT | INPUT | DIGIT | CMD,
+};
+
+}  // ns DEV
+
+using T_base_num = double;
+using T_bits = int;
+using T_str = QString;
+
+using T_num_btn = CPU::NumButton;
+using T_cmd_btn = CPU::CmdButton;
+using T_cpu_addr = CPU::Addr;
+using T_gpu_addr = GPU::Addr;
+using T_dev_addr = DEV::Addr;
 
 #endif // COMMON_TYPES_H
