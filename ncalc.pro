@@ -23,22 +23,22 @@ DEFINES += QT_DEPRECATED_WARNINGS
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 
-CONFIG += c++14
+CONFIG += c++17
 CONFIG(release, debug|release):DEFINES += QT_NO_DEBUG_OUTPUT
 
 SOURCES += \
         main.cc \
         mainwindow.cc \
-    core.cc \
     common_values.cc \
-    mem.cc
+    cpu.cc \
+    gpu.cpp
 
 HEADERS += \
         mainwindow.h \
-    core.h \
     common_values.h \
-    mem.h \
-    common_types.h
+    common_types.h \
+    cpu.h \
+    gpu.h
 
 FORMS += \
         mainwindow.ui

@@ -6,6 +6,20 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [1.1.2] - 2018-06-11
+### Added
+- gpu (converted cpu data to display)
+
+### Changed
+- cpu renamed from core
+
+### Refined
+- inner methods
+- connections between mainwindow and cpu (gpu)
+
+### Removed
+- mem class
+
 ## [1.1.0] - 2018-05-17
 ### Added
 - common_types

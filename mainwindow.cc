@@ -11,142 +11,135 @@
 #include <QDebug>
 #include <QMessageBox>
 
-/* class: MainWindow */
+// utilities
+namespace {
+
+T_bits _bitsCombined(T_bits bus, T_bits btn)
+{
+  return (bus << 8) | btn;
+}
+
+}  // ns inner global
+
+// class: MainWindow
 MainWindow::MainWindow(QWidget *parent) :
   QMainWindow(parent),
   ui(new Ui::MainWindow),
-  m_mem(nullptr),
-  m_core(nullptr),
-  cpu_thread(nullptr)
+  cpu_th(new QThread()),
+  gpu_th(new QThread()),
+  cpu(new CPU::Core()),
+  gpu(new GPU::Core())
 {
   ui->setupUi(this);
-  qDebug() << "MainWindow: construct";
-  if (!InitMemory()) {
-    qWarning() << "Cannot initialize memory!";
-    exit(EXIT_FAILURE);
-  }
-  if (!InitCore()) {
-    qWarning() << "Cannot initialize core!";
-    exit(EXIT_FAILURE);
-  }
   if (!InitConnections()) {
     qWarning() << "Cannot initialize connections!";
     exit(EXIT_FAILURE);
   }
-  if (!InitThread()) {
-    qWarning() << "Cannot initialize threads!";
-    exit(EXIT_FAILURE);
-  }
-  emit ToCore(OpCode::Reset, QVariant(0));
+  qDebug() << "MainWindow: constructed";
+
+  cpu_th->start();
+  gpu_th->start();
+  qDebug() << "MainWindow: cpu and gpu threads started";
+
+  PushCmdButton(CPU::CmdButton::CLEAR_ALL);
 }
 
 MainWindow::~MainWindow()
 {
-  if (m_core) m_core.reset();
-  if (cpu_thread) {
-    cpu_thread->quit();
-    cpu_thread->wait();
-    cpu_thread.reset();
+  if (cpu_th) {
+    cpu_th->quit();
+    cpu_th->wait();
+    cpu_th.reset();
   }
-  if (m_mem) m_mem.reset();
+  if (gpu_th) {
+    gpu_th->quit();
+    gpu_th->wait();
+    gpu_th.reset();
+  }
   delete ui;
   qDebug() << "MainWindow: destruct";
 }
 
-/* base */
-auto MainWindow::InitMemory() -> bool
+// slots
+void MainWindow::FromGpu(T_dev_addr addr, T_str val)
 {
-  m_mem.reset(new NCALC::Mem());
-
-  return true;
+  switch (addr) {
+  case DEV::Addr::RESULT:
+    UpdateResult(val);
+    break;
+  case DEV::Addr::INPUT:
+    UpdateInput(val);
+    break;
+  case DEV::Addr::DIGIT:
+    UpdateDigit(val);
+    break;
+  case DEV::Addr::CMD:
+    UpdateCmd(val);
+    break;
+  default:
+    break;
+  }
 }
 
-auto MainWindow::InitCore() -> bool
-{
-  if (m_mem.isNull()) return false;
-
-  m_core.reset(new NCALC::Core());
-  m_core->SetMemoryRef(m_mem.data());
-
-  return true;
-}
-
+// methods
 auto MainWindow::InitConnections() -> bool
 {
-  if (m_mem.isNull() || m_core.isNull()) return false;
+  if (cpu_th.isNull() || gpu_th.isNull() ||
+      cpu.isNull() || gpu.isNull()) return false;
 
-  qRegisterMetaType<T_opcode>("T_opcode");
-  qRegisterMetaType<T_arg>("T_arg");
+  // move to thread
+  cpu->moveToThread(cpu_th.data());
+  gpu->moveToThread(gpu_th.data());
 
-  connect(this, &MainWindow::ToCore, m_core.data(), &NCALC::Core::FromMWin);
-  connect(m_core.data(), &NCALC::Core::ToMWin, this, &MainWindow::FromCore);
+  // registered
+  qRegisterMetaType<T_bits>("T_bits");
+  qRegisterMetaType<T_base_num>("T_base_num");
+  qRegisterMetaType<T_dev_addr>("T_dev_addr");
+  qRegisterMetaType<T_str>("T_str");
+
+  // input to cpu
+  connect(this, &MainWindow::ToCpu, cpu.data(), &CPU::Core::FromInput);
+  // cpu to gpu
+  connect(cpu.data(), &CPU::Core::ToGpu, gpu.data(), &GPU::Core::FromCpu);
+  // gpu to output
+  connect(gpu.data(), &GPU::Core::ToDisplay, this, &MainWindow::FromGpu);
 
   return true;
 }
 
-auto MainWindow::InitThread() -> bool
+auto MainWindow::UpdateResult(const QString& val) -> void
 {
-  if (m_core.isNull()) return false;
-
-  cpu_thread.reset(new QThread());
-  m_core->moveToThread(cpu_thread.data());
-  cpu_thread->start();
-
-  return true;
+  ui->Display0->setText(val);
 }
 
-/* methods */
-auto MainWindow::UpdateGPU() -> void
+auto MainWindow::UpdateInput(const QString& val) -> void
 {
-  UpdateDisplays();
-  UpdateSubDisplays();
+  ui->Display1->setText(val);
 }
 
-auto MainWindow::UpdateDisplays() -> void
+auto MainWindow::UpdateDigit(const QString& val) -> void
 {
-  auto acc = m_mem->ToRegRead(Reg::ACC);
-  auto input = m_mem->ToRegRead(Reg::INPUT);
-  auto type = static_cast<NumType>(m_mem->ToStateRead(State::NumType));
-  auto digit = static_cast<Digit>(m_mem->ToStateRead(State::Digit));
-  if (type == NumType::Int) {
-    if (digit == Digit::DECIMAL) {
-      ui->Display0->setText(QString("%1").arg(static_cast<qint64>(acc)));
-      ui->Display1->setText(QString("%1").arg(static_cast<qint64>(input)));
-    } else {
-      auto acc_q64 = static_cast<qint64>(acc);
-      auto input_q64 = static_cast<qint64>(input);
-      ui->Display0->setText(QString("%1")
-                            .arg(acc_q64, acc_q64 < 0xffff ? 4: 8, 16, QLatin1Char( '0' )));
-      ui->Display1->setText(QString("%1")
-                            .arg(input_q64, input_q64 < 0xffff ? 4: 8, 16, QLatin1Char( '0' )));
-    }
-  } else {
-    ui->Display0->setText(QString("%1").arg(acc));
-    ui->Display1->setText(QString("%1").arg(input));
-  }
+  ui->Button_Digits->setText(val);
 }
 
-auto MainWindow::UpdateSubDisplays() -> void
+auto MainWindow::UpdateCmd(const QString& val) -> void
 {
-  auto digit = m_mem->ToStateRead(State::Digit);
-  if (ui->Button_Digits->text() == "DEC") {
-    if (static_cast<Digit>(digit) == Digit::HEXADECIMAL) {
-      ui->Button_Digits->setText("HEX");
-    }
-  } else {
-    if (static_cast<Digit>(digit) == Digit::DECIMAL) {
-      ui->Button_Digits->setText("DEC");
-    }
-  }
+  ui->Cmdlabel->setText(val);
 }
 
-/* slots */
-void MainWindow::FromCore()
+auto MainWindow::PushCmdButton(T_cmd_btn c) -> void
 {
-  UpdateGPU();
+  emit ToCpu(_bitsCombined(static_cast<T_bits>(CPU::Addr::CMD),
+                           static_cast<T_bits>(c)));
 }
 
-/* slots: menus */
+auto MainWindow::PushNumButton(T_num_btn n) -> void
+{
+  emit ToCpu(_bitsCombined(static_cast<T_bits>(CPU::Addr::NUM),
+                           static_cast<T_bits>(n)));
+}
+
+// slots: menus
 void MainWindow::on_actQuit_triggered()
 {
   close();
@@ -171,179 +164,159 @@ void MainWindow::on_actAboutApp_triggered()
   QMessageBox::about(this, title, msg);
 }
 
-/*
- * slots: command buttons
- */
+// slots: command buttons
 void MainWindow::on_Button_Undo_clicked()
 {
-  emit ToCore(OpCode::Undo, QVariant(0));
+  PushCmdButton(CPU::CmdButton::UNDO);
 }
 
 void MainWindow::on_Button_Redo_clicked()
 {
-  emit ToCore(OpCode::Redo, QVariant(0));
+  PushCmdButton(CPU::CmdButton::REDO);
 }
 
 void MainWindow::on_Button_Return_clicked()
 {
-  // Nothing any more currently
+  PushCmdButton(CPU::CmdButton::NOP);
 }
 
 void MainWindow::on_Button_Digits_clicked()
 {
-  emit ToCore(OpCode::ChangeDigit, QVariant(0));
+  PushCmdButton(CPU::CmdButton::CHANGE_DIGIT);
 }
 
 void MainWindow::on_Button_CL_clicked()
 {
-  // Current Input Clear
-  emit ToCore(OpCode::Clear, QVariant(0));
-  ui->Cmdlabel->setText("");
+  PushCmdButton(CPU::CmdButton::CLEAR_INPUT);
 }
 
 void MainWindow::on_Button_AC_clicked()
 {
-  // All Clear
-  emit ToCore(OpCode::Reset, QVariant(0));
-  ui->Cmdlabel->setText("");
+  PushCmdButton(CPU::CmdButton::CLEAR_ALL);
 }
 
-/*
- * slots: logical arithmetics
- */
 void MainWindow::on_Button_AND_clicked()
 {
-  emit ToCore(OpCode::And, QVariant(0));
-  ui->Cmdlabel->setText("&");
+  PushCmdButton(CPU::CmdButton::AND);
 }
 
 void MainWindow::on_Button_OR_clicked()
 {
-  emit ToCore(OpCode::Or, QVariant(0));
-  ui->Cmdlabel->setText("|");
+  PushCmdButton(CPU::CmdButton::OR);
 }
 
 void MainWindow::on_Button_XOR_clicked()
 {
-  emit ToCore(OpCode::Xor, QVariant(0));
-  ui->Cmdlabel->setText("^");
+  PushCmdButton(CPU::CmdButton::XOR);
 }
 
 void MainWindow::on_Button_NOT_clicked()
 {
-  emit ToCore(OpCode::Not, QVariant(0));
-  ui->Cmdlabel->setText("~");
+  PushCmdButton(CPU::CmdButton::NOT);
 }
 
-/* arithmetics */
 void MainWindow::on_Button_Add_clicked()
 {
-  emit ToCore(OpCode::Add, QVariant(0));
-  ui->Cmdlabel->setText("+");
+  PushCmdButton(CPU::CmdButton::ADD);
 }
 
 void MainWindow::on_Button_Subtract_clicked()
 {
-  emit ToCore(OpCode::Subtract, QVariant(0));
-  ui->Cmdlabel->setText("-");
+  PushCmdButton(CPU::CmdButton::SUBTRACT);
 }
 
 void MainWindow::on_Button_Multiply_clicked()
 {
-  emit ToCore(OpCode::Multiply, QVariant(0));
-  ui->Cmdlabel->setText("*");
+  PushCmdButton(CPU::CmdButton::MULTIPLY);
 }
 
 void MainWindow::on_Button_Devide_clicked()
 {
-  emit ToCore(OpCode::Devide, QVariant(0));
-  ui->Cmdlabel->setText("/");
+  PushCmdButton(CPU::CmdButton::DIVIDE);
 }
 
-/*
- * slots: number buttons
- */
+// slots: number buttons
 void MainWindow::on_Button_NUM_0_clicked()
 {
-  emit ToCore(OpCode::Store, QVariant(0));
+  PushNumButton(CPU::NumButton::NUM_0);
 }
 
 void MainWindow::on_Button_NUM_1_clicked()
 {
-  emit ToCore(OpCode::Store, QVariant(1));
+  PushNumButton(CPU::NumButton::NUM_1);
 }
 
 void MainWindow::on_Button_NUM_2_clicked()
 {
-  emit ToCore(OpCode::Store, QVariant(2));
+  PushNumButton(CPU::NumButton::NUM_2);
 }
 
 void MainWindow::on_Button_NUM_3_clicked()
 {
-  emit ToCore(OpCode::Store, QVariant(3));
+  PushNumButton(CPU::NumButton::NUM_3);
 }
 
 void MainWindow::on_Button_NUM_4_clicked()
 {
-  emit ToCore(OpCode::Store, QVariant(4));
+  PushNumButton(CPU::NumButton::NUM_4);
 }
 
 void MainWindow::on_Button_NUM_5_clicked()
 {
-  emit ToCore(OpCode::Store, QVariant(5));
+  PushNumButton(CPU::NumButton::NUM_5);
 }
 
 void MainWindow::on_Button_NUM_6_clicked()
 {
-  emit ToCore(OpCode::Store, QVariant(6));
+  PushNumButton(CPU::NumButton::NUM_6);
 }
 
 void MainWindow::on_Button_NUM_7_clicked()
 {
-  emit ToCore(OpCode::Store, QVariant(7));
+  PushNumButton(CPU::NumButton::NUM_7);
 }
 
 void MainWindow::on_Button_NUM_8_clicked()
 {
-  emit ToCore(OpCode::Store, QVariant(8));
+  PushNumButton(CPU::NumButton::NUM_8);
 }
 
 void MainWindow::on_Button_NUM_9_clicked()
 {
-  emit ToCore(OpCode::Store, QVariant(9));
+  PushNumButton(CPU::NumButton::NUM_9);
 }
 
 void MainWindow::on_Button_NUM_A_clicked()
 {
-  emit ToCore(OpCode::Store, QVariant(0xA));
+  PushNumButton(CPU::NumButton::NUM_A);
 }
 
 void MainWindow::on_Button_NUM_B_clicked()
 {
-  emit ToCore(OpCode::Store, QVariant(0xB));
+  PushNumButton(CPU::NumButton::NUM_B);
 }
 
 void MainWindow::on_Button_NUM_C_clicked()
 {
-  emit ToCore(OpCode::Store, QVariant(0xC));
+  PushNumButton(CPU::NumButton::NUM_C);
 }
 
 void MainWindow::on_Button_NUM_D_clicked()
 {
-  emit ToCore(OpCode::Store, QVariant(0xD));
+  PushNumButton(CPU::NumButton::NUM_D);
 }
 
 void MainWindow::on_Button_NUM_E_clicked()
 {
-  emit ToCore(OpCode::Store, QVariant(0xE));
+  PushNumButton(CPU::NumButton::NUM_E);
 }
 
 void MainWindow::on_Button_NUM_F_clicked()
 {
-  emit ToCore(OpCode::Store, QVariant(0xF));
+  PushNumButton(CPU::NumButton::NUM_F);
 }
 
 void MainWindow::on_Button_NUM_DOT_clicked()
 {
-  emit ToCore(OpCode::StoreDot, QVariant(0));
+  PushNumButton(CPU::NumButton::NUM_DOT);
 }

@@ -10,8 +10,8 @@
 
 #include "common_types.h"
 #include "common_values.h"
-#include "core.h"
-#include "mem.h"
+#include "cpu.h"
+#include "gpu.h"
 
 #include <QMainWindow>
 #include <QThread>
@@ -29,24 +29,24 @@ public:
   ~MainWindow();
   // member
   Ui::MainWindow *ui;
-  QScopedPointer<NCALC::Mem> m_mem;
-  QScopedPointer<NCALC::Core> m_core;
-  QScopedPointer<QThread> cpu_thread;
-  // base
-  bool InitMemory();
-  bool InitCore();
-  bool InitConnections();
-  bool InitThread();
+  QScopedPointer<QThread> cpu_th;
+  QScopedPointer<QThread> gpu_th;
+  QScopedPointer<CPU::Core> cpu;
+  QScopedPointer<GPU::Core> gpu;
   // methods
-  void UpdateGPU();
-  void UpdateDisplays();
-  void UpdateSubDisplays();
+  bool InitConnections();
+  void UpdateResult(const QString&);
+  void UpdateInput(const QString&);
+  void UpdateDigit(const QString&);
+  void UpdateCmd(const QString&);
+  void PushCmdButton(T_cmd_btn);
+  void PushNumButton(T_num_btn);
 
 signals:
-  void ToCore(T_opcode, T_arg);
+  void ToCpu(T_bits);
 
 public slots:
-  void FromCore();
+  void FromGpu(T_dev_addr, T_str);
 
 private slots:
   /* menus */
